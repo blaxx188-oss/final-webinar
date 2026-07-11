@@ -118,6 +118,7 @@ h1,h2,h3,h4{font-family:var(--font-display);color:var(--navy);font-weight:800;li
   pointer-events:none;
 }
 .hero-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:60px;align-items:center;position:relative;z-index:2;}
+.hero-grid > *{min-width:0;}
 .hero-badge{
   display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.1);
   border:1px solid rgba(255,255,255,.2);backdrop-filter:blur(8px);
@@ -138,9 +139,9 @@ h1,h2,h3,h4{font-family:var(--font-display);color:var(--navy);font-weight:800;li
 .speaker-card{
   background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);
   border-radius:var(--radius-lg);padding:20px;backdrop-filter:blur(16px);
-  box-shadow:var(--shadow-lg);
+  box-shadow:var(--shadow-lg);min-width:0;overflow:hidden;
 }
-.speaker-card img{border-radius:var(--radius-md);width:100%;aspect-ratio:1/1;object-fit:cover;}
+.speaker-card img{border-radius:var(--radius-md);width:100%;height:auto;aspect-ratio:1/1;object-fit:cover;}
 .speaker-card .name{color:#fff;font-family:var(--font-display);font-size:20px;font-weight:800;margin-top:16px;}
 .speaker-card .role{color:var(--gold-light);font-size:14px;margin-top:4px;}
 
@@ -174,7 +175,9 @@ h1,h2,h3,h4{font-family:var(--font-display);color:var(--navy);font-weight:800;li
 /* ===== About Speaker ===== */
 .speaker-section{background:#fff;}
 .speaker-grid{display:grid;grid-template-columns:.8fr 1.2fr;gap:60px;align-items:center;}
-.speaker-photo{position:relative;}
+.speaker-grid > *{min-width:0;}
+.speaker-photo{position:relative;min-width:0;overflow:hidden;max-width:380px;margin:0 auto;}
+.speaker-photo img{width:100%;height:auto;max-width:100%;aspect-ratio:4/5;object-fit:cover;}
 .speaker-photo img{border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);}
 .speaker-photo::before{
   content:"";position:absolute;inset:-14px;border:2px solid var(--gold);
@@ -333,4 +336,6 @@ h1,h2,h3,h4{font-family:var(--font-display);color:var(--navy);font-weight:800;li
   .count-box .num{font-size:24px;}
   .register-wrap{padding:28px 22px;}
   .countdown-wrap{flex-direction:column;}
+  .speaker-photo{max-width:220px;}
+  .speaker-photo::before{inset:-8px;}
 }
