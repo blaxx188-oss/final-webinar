@@ -1,184 +1,9 @@
-
-Claude finished the response
-
-/** * ========================================================= * وضوح | Webinar Registration Backend — Google Apps Script * ========================================================= * الوظائف: * 1. استقبال بيانات التسجيل من نموذج صفحة الهبوط (Fetch API). * 2. حفظها في Google Sheets. *
-
-pasted
-
-الشيت معملش اي صفوف بعد ماسطبت الكود
-
-
-شخّص خلل متغير وحدّد الحل البرمجي
-شخّص خلل متغير وحدّد الحل البرمجي
-المشكلة واضحة — في دالة getOrCreateSheet() تم استبدال SHEET_NAME بـ Webinar_Registrations بدون علامات تنصيص، فأصبح متغيرًا غير معرّف (undefined variable) بدلاً من نص. هذا يسبب خطأ فورًا عند أول استدعاء، فيتوقف doPost قبل أي appendRow — ولهذا الشيت فاضي تمامًا.
-
-الكود الحالي (خطأ):
-
-js
-function getOrCreateSheet() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName(Webinar_Registrations);   // ← بدون تنصيص = خطأ
-
-  if (!sheet) {
-    sheet = ss.insertSheet(Webinar_Registrations);          // ← نفس الخطأ
-    ...
-الإصلاح — استخدم الثابت SHEET_NAME كما في النسخة الأصلية:
-
-
-حدّد موقع الخلل في الكود المباشر للمستخدم
-حدّد موقع الخلل في الكود المباشر للمستخدم
-صحيح — ملف Code.gs عندي في المشروع سليم أصلاً (فيه SHEET_NAME بشكل صحيح). يبدو أن التعديل حصل بالخطأ عند اللصق أو التعديل اليدوي داخل محرر Apps Script نفسه.
-
-الخطوات لإصلاحه مباشرة في Google Apps Script:
-
-افتح محرر Apps Script (Extensions → Apps Script).
-ابحث عن دالة getOrCreateSheet().
-بدّل هذا السطر:
-js
-   let sheet = ss.getSheetByName(Webinar_Registrations);
-إلى:
-
-js
-   let sheet = ss.getSheetByName(SHEET_NAME);
-وبدّل هذا السطر:
-js
-   sheet = ss.insertSheet(Webinar_Registrations);
-إلى:
-
-js
-   sheet = ss.insertSheet(SHEET_NAME);
-احفظ (Ctrl+S)، ثم أعد النشر: Deploy → Manage deployments → ✏️ (تعديل) → Version: New version → Deploy.
-⚠️ مهم: أي تعديل على كود Apps Script لا يُطبَّق تلقائيًا على الرابط المنشور — لازم تعمل New version من نفس الـ Deployment الموجود (مو Deployment جديد بالكامل)، وإلا يبقى رابط /exec يشغّل النسخة القديمة.
-
-للتأكد إن المشكلة انحلت:
-
-افتح رابط الـ Web App مباشرة في المتصفح (GET request) — لازم يرجع لك:
-json
-  {"status":"ok","message":"Webinar registration API is running."}
-جرّب تسجيل تجريبي من الصفحة وتابع Executions في محرر Apps Script (الأيقونة الشبيهة بالساعة على اليسار) لو صار خطأ ثاني، بيظهر لك فيها بالتفصيل.
-هل الشيت اشتغل بعد التعديل؟
-
-هل الشيت هيشتغل بعد اما حد يسجل وهتظهر الاعمدة ولا مش شرط
-
-
-تحقق من متطلبات الربط والإعدادات التقنية للسكريبت
-تحقق من متطلبات الربط والإعدادات التقنية للسكريبت
-نعم — الأعمدة (صف العناوين) هتتكون تلقائيًا أول ما حد يسجل، مش شرط تعملها يدويًا. كده هيحصل بالظبط:
-
-آلية العمل
-عند أول تسجيل ناجح:
-
-الكود يدور على شيت اسمه Registrations (أو Webinar Registrations حسب النسخة عندك).
-مش موجود → يبتدي شيت جديد بنفس الاسم.
-يضيف صف العناوين تلقائيًا: التاريخ والوقت | الاسم الكامل | البريد الإلكتروني | رقم الجوال | المصدر | الصفحة | الحالة.
-يضيف صف بيانات المسجّل تحته مباشرة.
-من التسجيل التاني وبعده، الشيت هيبقى موجود فعليًا، فالكود هيكتفي بإضافة صف جديد تحت البيانات الموجودة (من غير ما يعيد إنشاء العناوين).
-
-⚠️ شرط واحد مهم لازم تتأكد منه
-الكود بيستخدم SpreadsheetApp.getActiveSpreadsheet()، وده بيشتغل صح بس لو مشروع Apps Script مربوط (container-bound) بالشيت نفسه — يعني عملته من جوه الشيت (Extensions → Apps Script)، زي ما شرحنا في الخطوات.
-
-لو بأي شكل عملت المشروع من script.google.com مباشرة (standalone script مش مربوط بشيت)، وقتها getActiveSpreadsheet() هيرجع null والكود هيرمي خطأ، ومفيش أي صف هيتضاف. في الحالة دي تحتاج تستبدلها بـ:
-
-js
-const ss = SpreadsheetApp.openById('ضع_معرف_الشيت_هنا');
-عشان تتأكد إن كل حاجة تمام: جرّب تسجيل تجريبي دلوقتي وشوف الشيت مباشرة. ولو محتاج تتأكد المشروع مربوط صح، افتح الشيت نفسه وشوف لو فيه Extensions → Apps Script بيفتح على نفس الكود اللي عندك.
-
-1783741894220_image.png
-بسجل برقم سعودي بيقولى حصل خطا عند التسجيل وكمان دا شكل الاند بيدج على الجوال
-
-
-تشخيص مشاكل التسجيل والتخطيط لإصلاح العرض
-تشخيص مشاكل التسجيل والتخطيط لإصلاح العرض
-المشكلتين واضحتين، خلينا نحلهم واحدة واحدة:
-
-1) مشكلة التسجيل بالرقم السعودي
-في الغالب السبب هو نفس حاجة قلنالها قبل كده: رابط API_URL في js/app.js لسه على القيمة الافتراضية (Placeholder) ومش متبدل برابط الـ Apps Script الحقيقي بتاعك. لو كده، أي محاولة تسجيل هترجع خطأ "تعذر إرسال التسجيل" فورًا بغض النظر عن الرقم.
-
-تأكد بسرعة:
-
-افتح js/app.js وشوف أول سطر:
-js
-   API_URL: 'PASTE_YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE',
-لو لسه زي كده → ده السبب، لازم تحطي رابط الـ /exec الحقيقي.
-2. لو الرابط متبدل فعلاً، افتحيه مباشرة في المتصفح (GET) لازم يرجع:
-
-json
-   {"status":"ok","message":"Webinar registration API is running."}
-لو رجع صفحة تسجيل دخول جوجل أو خطأ صلاحيات → ارجعي لإعدادات الـ Deploy وتأكدي إن Who has access = Anyone.
-3. لو الاتنين شغالين وبرضه بيرمي خطأ، افتحي Executions في محرر Apps Script بعد محاولة تسجيل، وهيوريكي رسالة الخطأ بالتفصيل.
-
-2) مشكلة تصميم الجوال (المحتوى مقطوع/متزحلق يمين)
-دي مشكلة overflow-x أفقي شائعة في صفحات RTL. الحل إني أضيف حماية صريحة تمنع أي عنصر يوسّع الصفحة أفقيًا:
-
-
-أعاد صياغة الطريقة لتمرير المعاملات بشكل صحيح
-أعاد صياغة الطريقة لتمرير المعاملات بشكل صحيح
-حدّثت css/style.css وأضفت الملف المضغوط الجديد. غيّري النسخة القديمة في سلة/الاستضافة بالملف الجديد، وامسحي الكاش (Ctrl+Shift+R أو من إعدادات المتصفح) قبل ما تفتحيها على الجوال عشان تتأكدي إن التعديل اتطبق.
-
-لو المشكلة استمرت بعد الرفع: ابعتيلي سكرين شوت للصفحة كاملة (مش بس أعلاها) بعد التحديث، وقوليلي هل بتفتحيها من رابط استضافة مباشر ولا من جوه سلة، عشان أقدر أحدد لو فيه تعارض مع قالب سلة نفسه.
-
-بالنسبة لمشكلة التسجيل، لو جربتي الخطوات اللي فوق وقلتيلي شكل رسالة الخطأ بالظبط (تظهر في الـ toast الأحمر تحت يمين الشاشة)، أقدر أحدد السبب بدقة أكتر.
-
-
-Webinar project
-ZIP 
-
-Style
-Code · CSS 
-1783742530604_image.png
-اولا الازاحه دي بسبب كبر صورة المدربه الثانيه وثانيا تم التسجيل بنجاح ولكن لم يتم تسجيل اى بيانات ف الشيت مع الرفم من اني تاكد بان الشيت {"status":"ok","message":"Webinar registration API is running."}
-
-
-تشخيص مشكلتي الصور والبيانات وصياغة الحلول
-تشخيص مشكلتي الصور والبيانات وصياغة الحلول
-شرحك مظبوط تمامًا للمشكلة الأولى، وفي تفسير منطقي كمان للمشكلة التانية. خلينا نصلحهم:
-
-1) إزاحة الصورة (سبب تقني معروف في CSS Grid)
-المشكلة إن الصورة بحجمها الطبيعي الكبير بتجبر عمود الـ Grid (.speaker-grid) يتمدد أكتر من العرض المتاح، لأن عناصر الـ Grid افتراضيًا عندها min-width: auto بتخليها ما تصغرش عن الحجم الطبيعي للمحتوى جواها، حتى لو حطينا max-width:100% على الصورة نفسها. الحل القياسي إني أجبر عناصر الـ Grid تاخد min-width:0:
-
-
-اقترح إضافة حل وقائي لمشاكل التخطيط
-اقترح إضافة حل وقائي لمشاكل التخطيط
-2) البيانات مش وصلت للشيت رغم إن الـ API شغال
-لو الـ GET رجعلك status: ok والفورم قالك "تم التسجيل بنجاح" — يبقى السيرفر شغال والطلب اتبعت واتنفذ من غير مشاكل. أغلب سبب لعدم ظهور البيانات:
-
-الكود بينشئ تبويب (Sheet Tab) جديد اسمه Registrations، مش بيكتب في Sheet1 الافتراضي.
-
-روحي لأسفل الشيت وشوفي لو فيه تبويب تاني اسمه Registrations جنب تبويب Sheet1 الأصلي (ممكن يكون مخفي لو التبويبات كتير أو الشاشة صغيرة). لو لقيتيه، البيانات هتكون هناك.
-
-لو مفيش تبويب تاني خالص:
-
-افتحي محرر Apps Script → اضغطي على أيقونة الساعة/التنفيذات Executions على اليسار.
-دوري على آخر تنفيذ لـ doPost بعد تسجيلتك التجريبية، وافتحيه شوفي هل نفّذ بنجاح ولا فيه خطأ متسجل.
-تأكدي كمان إن رابط API_URL في js/app.js هو نفس رابط الـ Deployment اللي عملتي منه GET (لو عندك أكتر من Deployment قديم وجديد، ممكن يكونوا بيشيروا لنسخ كود مختلفة).
-قوليلي تلاقي التبويب ولا لأ، وهنكمل من هناك.
-
-
-Ran a command, read a file
-Ran a command, read a file
-جاهز — رفعت النسخة المحدّثة من style.css والملف المضغوط الكامل. بعد ما ترفعيها، امسحي الكاش وجربي تاني، وقوليلي شكل صفحة "عن المدربة" دلوقتي.
-
-
-Webinar project
-ZIP 
-
-Style
-Code · CSS 
-
-You’ve used 90% of your session limit
-
-
-
-
-
-Claude is AI and can make mistakes. Please double-check responses.
-Style · CSS
 /* =========================================================
    وضوح | Webinar Landing Page — Premium Stylesheet
    Colors: Deep Navy #20264D, Indigo #3B4C8C, Gold #C99B4A,
            Cream #FAF8F4, Slate Text #4A4F63
    ========================================================= */
- 
+
 :root{
   --navy:#20264D;
   --indigo:#3B4C8C;
@@ -191,22 +16,22 @@ Style · CSS
   --border:#E7E4DC;
   --success:#2F9E6B;
   --danger:#D2564A;
- 
+
   --radius-sm:10px;
   --radius-md:18px;
   --radius-lg:28px;
- 
+
   --shadow-sm:0 2px 10px rgba(32,38,77,.06);
   --shadow-md:0 12px 32px rgba(32,38,77,.10);
   --shadow-lg:0 24px 60px rgba(32,38,77,.16);
- 
+
   --font-display:'Tajawal', 'Segoe UI', sans-serif;
   --font-body:'Cairo', 'Segoe UI', sans-serif;
- 
+
   --container:1180px;
   --transition:.35s cubic-bezier(.22,.9,.32,1);
 }
- 
+
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 html{
   scroll-behavior:smooth;
@@ -242,14 +67,14 @@ h1,h2,h3,h4{font-family:var(--font-display);color:var(--navy);font-weight:800;li
 }
 .section-title{font-size:clamp(28px,4vw,42px);text-align:center;margin-bottom:14px;}
 .section-sub{text-align:center;color:var(--text-light);font-size:17px;max-width:620px;margin:0 auto 56px;}
- 
+
 @media(prefers-reduced-motion:reduce){
   *{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;scroll-behavior:auto !important;}
 }
 :focus-visible{outline:3px solid var(--gold);outline-offset:3px;border-radius:4px;}
 .skip-link{position:absolute;right:-999px;top:0;background:var(--navy);color:#fff;padding:12px 20px;z-index:999;border-radius:0 0 8px 8px;}
 .skip-link:focus{right:0;}
- 
+
 /* ===== Buttons ===== */
 .btn{
   position:relative;overflow:hidden;
@@ -270,7 +95,7 @@ h1,h2,h3,h4{font-family:var(--font-display);color:var(--navy);font-weight:800;li
 .btn-block{width:100%;}
 .ripple{position:absolute;border-radius:50%;background:rgba(255,255,255,.55);transform:scale(0);animation:ripple-anim .6s ease-out;pointer-events:none;}
 @keyframes ripple-anim{to{transform:scale(4);opacity:0;}}
- 
+
 /* ===== Header ===== */
 .site-header{
   position:fixed;top:0;inset-inline:0;z-index:200;
@@ -279,7 +104,7 @@ h1,h2,h3,h4{font-family:var(--font-display);color:var(--navy);font-weight:800;li
 .site-header .container{display:flex;align-items:center;justify-content:space-between;}
 .site-header.scrolled{background:rgba(250,248,244,.9);backdrop-filter:blur(14px);box-shadow:var(--shadow-sm);padding:10px 0;}
 .header-cta{padding:12px 26px;font-size:14px;}
- 
+
 /* ===== Hero ===== */
 .hero{
   padding:180px 0 110px;
@@ -293,7 +118,6 @@ h1,h2,h3,h4{font-family:var(--font-display);color:var(--navy);font-weight:800;li
   pointer-events:none;
 }
 .hero-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:60px;align-items:center;position:relative;z-index:2;}
-.hero-grid > *{min-width:0;}
 .hero-badge{
   display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.1);
   border:1px solid rgba(255,255,255,.2);backdrop-filter:blur(8px);
@@ -314,12 +138,12 @@ h1,h2,h3,h4{font-family:var(--font-display);color:var(--navy);font-weight:800;li
 .speaker-card{
   background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);
   border-radius:var(--radius-lg);padding:20px;backdrop-filter:blur(16px);
-  box-shadow:var(--shadow-lg);min-width:0;overflow:hidden;
+  box-shadow:var(--shadow-lg);
 }
-.speaker-card img{border-radius:var(--radius-md);width:100%;height:auto;aspect-ratio:1/1;object-fit:cover;}
+.speaker-card img{border-radius:var(--radius-md);width:100%;aspect-ratio:1/1;object-fit:cover;}
 .speaker-card .name{color:#fff;font-family:var(--font-display);font-size:20px;font-weight:800;margin-top:16px;}
 .speaker-card .role{color:var(--gold-light);font-size:14px;margin-top:4px;}
- 
+
 /* ===== Countdown ===== */
 .countdown-section{background:var(--navy);padding:56px 0;}
 .countdown-wrap{display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap;}
@@ -332,7 +156,7 @@ h1,h2,h3,h4{font-family:var(--font-display);color:var(--navy);font-weight:800;li
 .count-box .num{font-family:var(--font-display);font-size:32px;font-weight:800;color:var(--gold-light);display:block;line-height:1;}
 .count-box .label{color:rgba(255,255,255,.65);font-size:12px;margin-top:6px;display:block;}
 .countdown-ended{display:none;color:var(--gold-light);font-weight:800;font-size:20px;text-align:center;}
- 
+
 /* ===== Cards Grid (What you'll learn) ===== */
 .learn-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:28px;}
 .learn-card{
@@ -346,13 +170,11 @@ h1,h2,h3,h4{font-family:var(--font-display);color:var(--navy);font-weight:800;li
 }
 .learn-card h3{font-size:19px;margin-bottom:10px;}
 .learn-card p{color:var(--text-light);font-size:15px;}
- 
+
 /* ===== About Speaker ===== */
 .speaker-section{background:#fff;}
 .speaker-grid{display:grid;grid-template-columns:.8fr 1.2fr;gap:60px;align-items:center;}
-.speaker-grid > *{min-width:0;}
-.speaker-photo{position:relative;min-width:0;overflow:hidden;}
-.speaker-photo img{width:100%;height:auto;max-width:100%;object-fit:cover;}
+.speaker-photo{position:relative;}
 .speaker-photo img{border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);}
 .speaker-photo::before{
   content:"";position:absolute;inset:-14px;border:2px solid var(--gold);
@@ -361,7 +183,7 @@ h1,h2,h3,h4{font-family:var(--font-display);color:var(--navy);font-weight:800;li
 .achieve-list{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:28px;}
 .achieve-item{display:flex;gap:12px;align-items:flex-start;background:var(--cream);padding:16px;border-radius:var(--radius-sm);}
 .achieve-item svg{flex:none;color:var(--gold);margin-top:2px;}
- 
+
 /* ===== Testimonials ===== */
 .testi-section{background:var(--cream);}
 .testi-track{display:flex;gap:24px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:16px;}
@@ -380,7 +202,7 @@ h1,h2,h3,h4{font-family:var(--font-display);color:var(--navy);font-weight:800;li
 .testi-nav{display:flex;justify-content:center;gap:10px;margin-top:24px;}
 .testi-dot{width:9px;height:9px;border-radius:50%;background:var(--border);transition:background var(--transition), width var(--transition);}
 .testi-dot.active{background:var(--gold);width:24px;border-radius:6px;}
- 
+
 /* ===== Agenda Timeline ===== */
 .agenda-section{background:#fff;}
 .timeline{max-width:760px;margin:0 auto;position:relative;}
@@ -394,7 +216,7 @@ h1,h2,h3,h4{font-family:var(--font-display);color:var(--navy);font-weight:800;li
 .tl-content{background:var(--cream);border-radius:var(--radius-sm);padding:18px 22px;}
 .tl-content h4{font-size:16px;margin-bottom:6px;}
 .tl-content p{font-size:14px;color:var(--text-light);}
- 
+
 /* ===== Bonuses ===== */
 .bonus-section{background:linear-gradient(160deg,var(--navy),var(--indigo));}
 .bonus-section .section-title,.bonus-section .section-sub{color:#fff;}
@@ -407,7 +229,7 @@ h1,h2,h3,h4{font-family:var(--font-display);color:var(--navy);font-weight:800;li
 .bonus-value{display:inline-block;background:var(--gold);color:var(--navy);font-weight:800;font-size:12px;padding:4px 12px;border-radius:100px;margin-bottom:14px;}
 .bonus-card h3{color:#fff;font-size:18px;margin-bottom:8px;}
 .bonus-card p{color:rgba(255,255,255,.7);font-size:14px;}
- 
+
 /* ===== FAQ ===== */
 .faq-section{background:var(--cream);}
 .faq-list{max-width:760px;margin:0 auto;}
@@ -421,7 +243,7 @@ h1,h2,h3,h4{font-family:var(--font-display);color:var(--navy);font-weight:800;li
 .faq-a{max-height:0;overflow:hidden;transition:max-height var(--transition), padding var(--transition);padding:0 24px;}
 .faq-item.open .faq-a{max-height:300px;padding:0 24px 20px;}
 .faq-a p{color:var(--text-light);font-size:14px;}
- 
+
 /* ===== Registration Form ===== */
 .register-section{background:#fff;}
 .register-wrap{
@@ -446,7 +268,7 @@ h1,h2,h3,h4{font-family:var(--font-display);color:var(--navy);font-weight:800;li
 .btn.loading .spinner{display:inline-block;}
 .btn.loading .btn-text{display:none;}
 @keyframes spin{to{transform:rotate(360deg);}}
- 
+
 /* ===== Modal ===== */
 .modal-overlay{
   position:fixed;inset:0;background:rgba(32,38,77,.55);backdrop-filter:blur(6px);
@@ -467,7 +289,7 @@ h1,h2,h3,h4{font-family:var(--font-display);color:var(--navy);font-weight:800;li
 .modal-box p{color:var(--text-light);font-size:15px;margin-bottom:26px;}
 .modal-actions{display:flex;flex-direction:column;gap:12px;}
 .modal-close{position:absolute;top:18px;left:18px;color:var(--text-light);font-size:22px;}
- 
+
 /* ===== Toast ===== */
 .toast-wrap{position:fixed;bottom:24px;left:24px;z-index:1000;display:flex;flex-direction:column;gap:10px;}
 .toast{
@@ -477,14 +299,14 @@ h1,h2,h3,h4{font-family:var(--font-display);color:var(--navy);font-weight:800;li
 }
 .toast.show{transform:translateX(0);}
 .toast.error{background:var(--danger);}
- 
+
 /* ===== Footer ===== */
 .site-footer{background:var(--navy);color:rgba(255,255,255,.6);padding:40px 0;text-align:center;font-size:13px;}
- 
+
 /* ===== Scroll Reveal ===== */
 .reveal{opacity:0;transform:translateY(30px);transition:opacity .8s ease, transform .8s ease;}
 .reveal.in-view{opacity:1;transform:translateY(0);}
- 
+
 /* ===== Thank you page specific ===== */
 .ty-hero{padding:160px 0 100px;text-align:center;background:linear-gradient(160deg,var(--navy),var(--indigo));color:#fff;}
 .ty-check{
@@ -494,7 +316,7 @@ h1,h2,h3,h4{font-family:var(--font-display);color:var(--navy);font-weight:800;li
 .ty-video{max-width:760px;margin:50px auto 0;border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow-lg);aspect-ratio:16/9;background:#000;}
 .ty-video iframe{width:100%;height:100%;border:0;}
 .ty-actions{display:flex;justify-content:center;gap:16px;flex-wrap:wrap;margin-top:34px;}
- 
+
 /* ===== Responsive ===== */
 @media(max-width:980px){
   .hero-grid,.speaker-grid{grid-template-columns:1fr;}
@@ -512,8 +334,3 @@ h1,h2,h3,h4{font-family:var(--font-display);color:var(--navy);font-weight:800;li
   .register-wrap{padding:28px 22px;}
   .countdown-wrap{flex-direction:column;}
 }
- 
-
-
-
-
