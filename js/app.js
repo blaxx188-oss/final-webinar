@@ -25,6 +25,8 @@ const CONFIG = {
 
 /* -----------------------------------------------------------
    1. DataLayer helper — لأغراض GTM / GA4
+   ملاحظة: كل التتبع يمر من هنا فقط. لا تُطلق أكواد Meta/TikTok/Snap
+   مباشرة من هذا الملف؛ اجعل GTM يستمع لهذه الأحداث ويوزّعها.
    ----------------------------------------------------------- */
 window.dataLayer = window.dataLayer || [];
 function pushEvent(eventName, payload = {}) {
@@ -34,6 +36,11 @@ function pushEvent(eventName, payload = {}) {
 
 document.addEventListener('DOMContentLoaded', () => {
   pushEvent('page_view', { page: 'landing' });
+
+  // تتبّع المستخدم المتفاعل (بقي أكثر من 30 ثانية على الصفحة)
+  setTimeout(() => {
+    pushEvent('engaged_user', { seconds: 30 });
+  }, 30000);
 
   initHeaderScroll();
   initCountdown();
@@ -130,7 +137,7 @@ function initRevealOnScroll() {
 }
 
 /* -----------------------------------------------------------
-   5. FAQ Accordion
+   5. FAQ Accordion (+ تتبّع فتح كل سؤال)
    ----------------------------------------------------------- */
 function initFAQAccordion() {
   const items = document.querySelectorAll('.faq-item');
@@ -139,7 +146,10 @@ function initFAQAccordion() {
     btn.addEventListener('click', () => {
       const isOpen = item.classList.contains('open');
       items.forEach(i => i.classList.remove('open'));
-      if (!isOpen) item.classList.add('open');
+      if (!isOpen) {
+        item.classList.add('open');
+        pushEvent('faq_open', { question: btn.innerText });
+      }
     });
   });
 }
@@ -171,7 +181,7 @@ function initTestimonialsSlider() {
 }
 
 /* -----------------------------------------------------------
-   7. Ripple effect على الأزرار
+   7. Ripple effect على الأزرار (+ تتبّع نقرات CTA عبر data-analytics)
    ----------------------------------------------------------- */
 function initRippleButtons() {
   document.querySelectorAll('.btn').forEach(btn => {
@@ -186,6 +196,7 @@ function initRippleButtons() {
       this.appendChild(ripple);
       setTimeout(() => ripple.remove(), 650);
 
+      // ضع data-analytics="hero_cta_click" أو أي اسم مناسب على أي زر تريد تتبعه
       if (this.dataset.analytics) pushEvent(this.dataset.analytics);
     });
   });
@@ -238,6 +249,15 @@ function isValidSaudiPhone(v) {
   return /^(05\d{8}|9665\d{8}|\+9665\d{8})$/.test(clean);
 }
 
+// توليد معرّف فريد؛ يعتمد على crypto.randomUUID عند توفره (يتطلب HTTPS)
+// مع بديل آمن للمتصفحات القديمة أو الاستضافة عبر HTTP
+function generateLeadId() {
+  if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+    return window.crypto.randomUUID();
+  }
+  return 'lead-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10);
+}
+
 /* -----------------------------------------------------------
    11. Registration Form — Fetch API بدون إعادة تحميل الصفحة
    ----------------------------------------------------------- */
@@ -248,11 +268,22 @@ function initRegistrationForm() {
   const submitBtn = document.getElementById('submitBtn');
   let isSubmitting = false;
 
+  // تتبّع أول تفاعل فعلي مع الفورم (form_start) — منفصل عن begin_registration عند الإرسال
+  let formStarted = false;
+  form.querySelectorAll('input').forEach(input => {
+    input.addEventListener('focus', () => {
+      if (!formStarted) {
+        formStarted = true;
+        pushEvent('form_start');
+      }
+    });
+  });
+
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (isSubmitting) return; // منع الإرسال المزدوج
 
-    pushEvent('start_registration');
+    pushEvent('begin_registration');
 
     const fullName = document.getElementById('fullName');
     const email = document.getElementById('email');
@@ -275,12 +306,14 @@ function initRegistrationForm() {
     }
 
     if (!valid) {
+      pushEvent('validation_error');
       showToast('يرجى تصحيح الحقول المظلّلة بالأحمر', 'error');
       return;
     }
 
     // منع التسجيل المكرر من نفس الجهاز
     if (localStorage.getItem(CONFIG.LS_KEY)) {
+      pushEvent('duplicate_registration', { source: 'local_storage' });
       showToast('لقد سجّلت مسبقًا من هذا الجهاز 👍', 'error');
       openSuccessModal();
       return;
@@ -290,13 +323,33 @@ function initRegistrationForm() {
     submitBtn.classList.add('loading');
     submitBtn.disabled = true;
 
+    // التقاط UTM Parameters من رابط الصفحة (حملات Meta/TikTok/Google)
+    const urlParams = new URLSearchParams(window.location.search);
+    const utm = {
+      source: urlParams.get('utm_source'),
+      medium: urlParams.get('utm_medium'),
+      campaign: urlParams.get('utm_campaign'),
+      content: urlParams.get('utm_content'),
+      term: urlParams.get('utm_term')
+    };
+
+    // معرّف فريد لكل Lead لتسهيل مطابقة البيانات بين الأنظمة (Sheets / GTM / CRM)
+    const leadId = generateLeadId();
+
     const payload = {
+      leadId,
       fullName: fullName.value.trim(),
       email: email.value.trim(),
       phone: phone.value.trim(),
       source: document.referrer || 'direct',
       page: window.location.href,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      utm_source: utm.source,
+      utm_medium: utm.medium,
+      utm_campaign: utm.campaign,
+      utm_content: utm.content,
+      utm_term: utm.term,
+      page_load_time: Math.round(performance.now())
     };
 
     try {
@@ -310,16 +363,23 @@ function initRegistrationForm() {
 
       if (result.status === 'success') {
         localStorage.setItem(CONFIG.LS_KEY, JSON.stringify({ email: payload.email, date: payload.timestamp }));
-        pushEvent('registration_success', { email: payload.email });
 
-        // Meta Pixel — بعد نجاح التسجيل
-        if (typeof fbq === 'function') fbq('track', 'Lead');
-        // TikTok Pixel — بعد نجاح التسجيل
-        if (typeof ttq !== 'undefined') ttq.track('CompleteRegistration');
+        // ملاحظة: لا نطلق fbq/ttq هنا — GTM هو من يستمع لحدث registration_success
+        // ويوزّعه على GA4 / Meta Lead / TikTok CompleteRegistration / Snap SIGN_UP.
+        // ملاحظة أخرى: لا نرسل بيانات شخصية (PII) مثل البريد الإلكتروني إلى dataLayer/GTM/GA4.
+        pushEvent('registration_success', {
+          lead_id: payload.leadId,
+          method: 'landing_page',
+          webinar: CONFIG.WEBINAR_TITLE,
+          utm_source: payload.utm_source,
+          utm_medium: payload.utm_medium,
+          utm_campaign: payload.utm_campaign
+        });
 
         openSuccessModal();
         form.reset();
       } else if (result.status === 'duplicate') {
+        pushEvent('duplicate_registration', { source: 'server' });
         showToast('هذا البريد أو الجوال مسجّل مسبقًا', 'error');
         pushEvent('registration_failed', { reason: 'duplicate' });
       } else {
@@ -357,11 +417,30 @@ function checkAlreadyRegistered() {
 function openSuccessModal() {
   const modal = document.getElementById('successModal');
   if (!modal) return;
+
+  pushEvent('thank_you_modal');
+
   modal.classList.add('active');
   document.body.style.overflow = 'hidden';
 
-  document.getElementById('addToCalendarBtn').href = buildGoogleCalendarLink();
-  document.getElementById('joinWhatsappBtn').href = CONFIG.WHATSAPP_GROUP_URL;
+  const calendarBtn = document.getElementById('addToCalendarBtn');
+  calendarBtn.href = buildGoogleCalendarLink();
+  // نضيف مستمع النقر مرة واحدة فقط لتفادي تكرار الحدث في كل مرة يُفتح فيها المودال
+  if (!calendarBtn.dataset.trackingBound) {
+    calendarBtn.dataset.trackingBound = 'true';
+    calendarBtn.addEventListener('click', () => {
+      pushEvent('add_to_calendar');
+    });
+  }
+
+  const whatsappBtn = document.getElementById('joinWhatsappBtn');
+  whatsappBtn.href = CONFIG.WHATSAPP_GROUP_URL;
+  if (!whatsappBtn.dataset.trackingBound) {
+    whatsappBtn.dataset.trackingBound = 'true';
+    whatsappBtn.addEventListener('click', () => {
+      pushEvent('join_whatsapp');
+    });
+  }
 }
 
 function closeSuccessModal() {
