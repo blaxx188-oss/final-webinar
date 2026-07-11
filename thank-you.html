@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>تم التسجيل بنجاح | وضوح — ويبنار مجاني</title>
+<meta name="description" content="شكرًا لتسجيلك في الويبنار المجاني. تحقق من بريدك الإلكتروني للحصول على رابط الانضمام.">
+<meta name="robots" content="noindex, follow">
+<link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Tajawal:wght@700;800&family=Cairo:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="css/style.css">
+
+<!-- ==========================================================
+     GTM — نفس كود GTM الموجود في index.html، الصقه هنا أيضًا
+     ========================================================== -->
+</head>
+<body>
+
+<header class="site-header scrolled">
+  <div class="container">
+    <a href="index.html"><img src="assets/logo.svg" alt="شعار وضوح" width="140" height="36"></a>
+  </div>
+</header>
+
+<section class="ty-hero">
+  <div class="container">
+    <div class="ty-check">
+      <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+    </div>
+    <h1 style="color:#fff;">تم تسجيلك بنجاح! 🎉</h1>
+    <p class="lead" style="color:rgba(255,255,255,.8);max-width:560px;margin:16px auto 0;">
+      شكرًا لانضمامك إلى ويبنار "لماذا تشعر بالضياع رغم نجاحك؟". تحقق من بريدك الإلكتروني الآن — أرسلنا لك رابط الانضمام وكل التفاصيل.
+    </p>
+
+    <div class="ty-video">
+      <iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ" title="فيديو ترحيبي" loading="lazy" allowfullscreen></iframe>
+    </div>
+
+    <div class="countdown-wrap" style="margin-top:44px;">
+      <span class="countdown-title" style="color:#fff;">الويبنار يبدأ خلال:</span>
+      <div class="countdown" id="countdown" data-target="2026-08-01T20:00:00+03:00">
+        <div class="count-box"><span class="num" id="cd-days">00</span><span class="label">يوم</span></div>
+        <div class="count-box"><span class="num" id="cd-hours">00</span><span class="label">ساعة</span></div>
+        <div class="count-box"><span class="num" id="cd-mins">00</span><span class="label">دقيقة</span></div>
+        <div class="count-box"><span class="num" id="cd-secs">00</span><span class="label">ثانية</span></div>
+      </div>
+      <div class="countdown-ended" id="countdownEnded" style="color:var(--gold-light);">🔴 الويبنار بدأ الآن</div>
+    </div>
+
+    <div class="ty-actions">
+      <a href="#" id="tyCalendarBtn" class="btn btn-primary">أضف إلى Google Calendar</a>
+      <a href="#" id="tyWhatsappBtn" class="btn btn-outline">انضم إلى قروب واتساب</a>
+    </div>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="container"><p>© 2026 جميع الحقوق محفوظة — وضوح</p></div>
+</footer>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script src="js/app.js"></script>
+<script>
+  // ربط أزرار صفحة الشكر بنفس إعدادات التقويم وواتساب
+  document.addEventListener('DOMContentLoaded', () => {
+    pushEvent('page_view', { page: 'thank_you' });
+    const calBtn = document.getElementById('tyCalendarBtn');
+    const waBtn = document.getElementById('tyWhatsappBtn');
+    if (calBtn) calBtn.href = buildGoogleCalendarLink();
+    if (waBtn) waBtn.href = window.WEBINAR_CONFIG.WHATSAPP_GROUP_URL;
+  });
+</script>
+</body>
+</html>

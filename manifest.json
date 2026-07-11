@@ -1,0 +1,15 @@
+{
+  "name": "وضوح | ويبنار مجاني",
+  "short_name": "وضوح",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#FAF8F4",
+  "theme_color": "#20264D",
+  "icons": [
+    {
+      "src": "assets/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
