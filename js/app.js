@@ -9,7 +9,7 @@
    ----------------------------------------------------------- */
 const CONFIG = {
   // رابط Google Apps Script Web App (بعد النشر) — استبدله برابطك
-  API_URL: 'PASTE_YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE',
+  API_URL: 'https://script.google.com/macros/s/AKfycbx_Q7Vgx2u4jTsv-1Zamx90nF05N652KuCI7bjCX6gE8-BtFoovm4iO4_SCQ8VRtQ2H/exec',
 
   // تفاصيل الويبنار لأغراض التقويم والعداد
   WEBINAR_TITLE: 'لماذا تشعر بالضياع رغم نجاحك؟',
