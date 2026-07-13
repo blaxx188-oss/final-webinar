@@ -29,12 +29,14 @@ const CONFIG = {
    مباشرة من هذا الملف؛ اجعل GTM يستمع لهذه الأحداث ويوزّعها.
    ----------------------------------------------------------- */
 window.dataLayer = window.dataLayer || [];
+
 function pushEvent(eventName, payload = {}) {
   window.dataLayer.push({ event: eventName, ...payload });
   // console.log('[dataLayer]', eventName, payload); // فعّل هذا السطر أثناء التطوير فقط
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+   console.log("وصلنا هنا");
   pushEvent('page_view', { page: 'landing' });
 
   // تتبّع المستخدم المتفاعل (بقي أكثر من 30 ثانية على الصفحة)
