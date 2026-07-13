@@ -11,7 +11,7 @@
    ----------------------------------------------------------------------- */
 var CONFIG = {
   SHEET_NAME: 'Registrations',
-  ADMIN_EMAIL: 'admin@example.com',
+  ADMIN_EMAIL: 'blaxx188@gmail.com',
   WEBINAR_NAME: 'لماذا تشعر بالضياع رغم نجاحك؟',
   WEBINAR_DATE_TEXT: 'السبت 1 أغسطس 2026 - الساعة 8:00 مساءً',
   WEBINAR_JOIN_LINK: 'https://example.com/live',
