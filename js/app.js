@@ -353,28 +353,13 @@ function initRegistrationForm() {
     };
 
     try {
-    const response = await fetch(CONFIG.API_URL, {
-  method: "POST",
-  headers: {
-    "Content-Type": "text/plain;charset=utf-8"
-  },
-  body: JSON.stringify(payload)
-});
+      const response = await fetch(CONFIG.API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // text/plain لتفادي مشاكل CORS مع Apps Script
+        body: JSON.stringify(payload)
+      });
 
-console.log("Response Object:", response);
-console.log("Status:", response.status);
-console.log("OK:", response.ok);
-console.log("Redirected:", response.redirected);
-console.log("URL:", response.url);
-
-const text = await response.text();
-console.log("Response Body:", text);
-
-// أوقف التنفيذ مؤقتًا
-return;
-
-console.log("STATUS", response.status);
-console.log("BODY", text);
+      const result = await response.json();
 
       if (result.status === 'success') {
         localStorage.setItem(CONFIG.LS_KEY, JSON.stringify({ email: payload.email, date: payload.timestamp }));
