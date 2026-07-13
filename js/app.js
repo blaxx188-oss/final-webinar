@@ -359,7 +359,10 @@ function initRegistrationForm() {
         body: JSON.stringify(payload)
       });
 
-      const result = await response.json();
+      const text = await response.text();
+
+console.log("STATUS", response.status);
+console.log("BODY", text);
 
       if (result.status === 'success') {
         localStorage.setItem(CONFIG.LS_KEY, JSON.stringify({ email: payload.email, date: payload.timestamp }));
