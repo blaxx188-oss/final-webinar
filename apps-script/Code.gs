@@ -1,206 +1,489 @@
-/**
- * =========================================================
- * وضوح | Webinar Registration Backend — Google Apps Script
- * =========================================================
- * الوظائف:
- * 1. استقبال بيانات التسجيل من نموذج صفحة الهبوط (Fetch API).
- * 2. حفظها في Google Sheets.
- * 3. منع التسجيل المكرر (بالبريد الإلكتروني أو رقم الجوال).
- * 4. إرسال بريد ترحيبي تلقائي للمستخدم.
- * 5. إرسال إشعار بريد للإدارة عند كل تسجيل جديد.
- *
- * طريقة النشر: راجع README.md — قسم "نشر Google Apps Script"
- * =========================================================
- */
+/* =========================================================
+   وضوح | Webinar Landing Page — app.js
+   Vanilla JS ES6 — بدون أي مكتبات خارجية
+   ========================================================= */
+'use strict';
 
-/* ----------------------- إعدادات عامة ----------------------- */
-// اسم الشيت الذي سيتم الكتابة فيه (سيُنشأ تلقائيًا إن لم يوجد)
-const SHEET_NAME = 'Registrations';
+/* -----------------------------------------------------------
+   0. إعدادات عامة — عدّل هذه القيم حسب مشروعك
+   ----------------------------------------------------------- */
+const CONFIG = {
+  // رابط Google Apps Script Web App (بعد النشر) — استبدله برابطك
+  API_URL: 'https://script.google.com/macros/s/AKfycbx_Q7Vgx2u4jTsv-1Zamx90nF05N652KuCI7bjCX6gE8-BtFoovm4iO4_SCQ8VRtQ2H/exec',
 
-// البريد الإلكتروني الذي سيصله إشعار عند كل تسجيل جديد
-const ADMIN_EMAIL = 'admin@example.com'; // ⚠️ استبدل هذا ببريدك الإداري
+  // تفاصيل الويبنار لأغراض التقويم والعداد
+  WEBINAR_TITLE: 'لماذا تشعر بالضياع رغم نجاحك؟',
+  WEBINAR_DESCRIPTION: 'ويبنار مجاني مباشر حول الوضوح الذهني واتخاذ القرار بثقة.',
+  WEBINAR_DATE_ISO: '2026-08-01T20:00:00+03:00', // موعد بداية الويبنار
+  WEBINAR_DURATION_MIN: 75,
+  WEBINAR_JOIN_URL: 'https://example.com/live', // رابط البث المباشر الفعلي
+  WHATSAPP_GROUP_URL: 'https://chat.whatsapp.com/PASTE_YOUR_GROUP_INVITE_LINK',
 
-// اسم الويبنار (يُستخدم في نصوص البريد الإلكتروني)
-const WEBINAR_TITLE = 'لماذا تشعر بالضياع رغم نجاحك؟';
-const WEBINAR_DATE_TEXT = 'السبت، 1 أغسطس 2026 — 8:00 مساءً بتوقيت السعودية';
-const WEBINAR_JOIN_URL = 'https://example.com/live'; // ⚠️ استبدل برابط البث الفعلي
+  // مفتاح Local Storage لمنع التسجيل المكرر من نفس الجهاز
+  LS_KEY: 'webinar_registered_v1'
+};
 
-/**
- * نقطة الدخول الرئيسية لطلبات POST القادمة من نموذج التسجيل
- */
-function doPost(e) {
-  const lock = LockService.getScriptLock();
-  lock.waitLock(15000); // منع التعارض عند وصول طلبين في نفس اللحظة
+/* -----------------------------------------------------------
+   1. DataLayer helper — لأغراض GTM / GA4
+   ملاحظة: كل التتبع يمر من هنا فقط. لا تُطلق أكواد Meta/TikTok/Snap
+   مباشرة من هذا الملف؛ اجعل GTM يستمع لهذه الأحداث ويوزّعها.
+   ----------------------------------------------------------- */
+window.dataLayer = window.dataLayer || [];
+function pushEvent(eventName, payload = {}) {
+  window.dataLayer.push({ event: eventName, ...payload });
+  // console.log('[dataLayer]', eventName, payload); // فعّل هذا السطر أثناء التطوير فقط
+}
 
-  try {
-    const data = parseRequestData(e);
+document.addEventListener('DOMContentLoaded', () => {
+  pushEvent('page_view', { page: 'landing' });
 
-    // ----- التحقق الأساسي من البيانات -----
-    const validation = validateInput(data);
-    if (!validation.valid) {
-      return buildJsonResponse({ status: 'error', message: validation.message });
+  // تتبّع المستخدم المتفاعل (بقي أكثر من 30 ثانية على الصفحة)
+  setTimeout(() => {
+    pushEvent('engaged_user', { seconds: 30 });
+  }, 30000);
+
+  initHeaderScroll();
+  initCountdown();
+  initRevealOnScroll();
+  initFAQAccordion();
+  initTestimonialsSlider();
+  initRippleButtons();
+  initScrollDepthTracking();
+  initRegistrationForm();
+  initModalControls();
+  checkAlreadyRegistered();
+});
+
+/* -----------------------------------------------------------
+   2. Header — تغيير الخلفية عند التمرير
+   ----------------------------------------------------------- */
+function initHeaderScroll() {
+  const header = document.getElementById('siteHeader');
+  if (!header) return;
+  const onScroll = () => {
+    header.classList.toggle('scrolled', window.scrollY > 40);
+  };
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+}
+
+/* -----------------------------------------------------------
+   3. Countdown Timer
+   ----------------------------------------------------------- */
+function initCountdown() {
+  const wrap = document.getElementById('countdown');
+  const endedMsg = document.getElementById('countdownEnded');
+  if (!wrap) return;
+
+  const target = new Date(wrap.dataset.target).getTime();
+  const els = {
+    days: document.getElementById('cd-days'),
+    hours: document.getElementById('cd-hours'),
+    mins: document.getElementById('cd-mins'),
+    secs: document.getElementById('cd-secs')
+  };
+
+  let finishedFired = false;
+
+  function tick() {
+    const now = Date.now();
+    const diff = target - now;
+
+    if (diff <= 0) {
+      wrap.style.display = 'none';
+      endedMsg.style.display = 'block';
+      if (!finishedFired) {
+        finishedFired = true;
+        pushEvent('countdown_finished');
+      }
+      clearInterval(timer);
+      return;
     }
 
-    const sheet = getOrCreateSheet();
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+    const mins = Math.floor((diff / (1000 * 60)) % 60);
+    const secs = Math.floor((diff / 1000) % 60);
 
-    // ----- التحقق من التسجيل المكرر (بالبريد أو الجوال) -----
-    if (isDuplicate(sheet, data.email, data.phone)) {
-      return buildJsonResponse({ status: 'duplicate', message: 'هذا البريد أو رقم الجوال مسجّل مسبقًا.' });
-    }
-
-    // ----- حفظ البيانات في الشيت -----
-    sheet.appendRow([
-      new Date(),               // تاريخ ووقت التسجيل
-      data.fullName,
-      data.email,
-      data.phone,
-      data.source || '',
-      data.page || '',
-      'مسجّل'                    // حالة التسجيل
-    ]);
-
-    // ----- إرسال بريد ترحيبي للمستخدم -----
-    sendUserConfirmationEmail(data);
-
-    // ----- إشعار الإدارة -----
-    sendAdminNotificationEmail(data);
-
-    return buildJsonResponse({ status: 'success', message: 'تم التسجيل بنجاح.' });
-
-  } catch (err) {
-    return buildJsonResponse({ status: 'error', message: 'حدث خطأ في الخادم: ' + err.message });
-  } finally {
-    lock.releaseLock();
+    els.days.textContent = String(days).padStart(2, '0');
+    els.hours.textContent = String(hours).padStart(2, '0');
+    els.mins.textContent = String(mins).padStart(2, '0');
+    els.secs.textContent = String(secs).padStart(2, '0');
   }
+
+  tick();
+  const timer = setInterval(tick, 1000);
 }
 
-/**
- * دعم طلبات GET لأغراض اختبار أن الرابط يعمل فقط
- */
-function doGet(e) {
-  return buildJsonResponse({ status: 'ok', message: 'Webinar registration API is running.' });
+/* -----------------------------------------------------------
+   4. Scroll Reveal — Intersection Observer (بدون مكتبات)
+   ----------------------------------------------------------- */
+function initRevealOnScroll() {
+  const items = document.querySelectorAll('.reveal');
+  if (!items.length || !('IntersectionObserver' in window)) {
+    items.forEach(el => el.classList.add('in-view'));
+    return;
+  }
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('in-view');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.15 });
+
+  items.forEach(el => observer.observe(el));
 }
 
-/* ----------------------- دوال مساعدة ----------------------- */
-
-/**
- * تحليل بيانات الطلب القادم (JSON عبر text/plain لتفادي مشاكل CORS)
- */
-function parseRequestData(e) {
-  if (!e || !e.postData || !e.postData.contents) {
-    throw new Error('لا توجد بيانات في الطلب.');
-  }
-  return JSON.parse(e.postData.contents);
-}
-
-/**
- * التحقق الأساسي من صحة البيانات المُرسلة
- */
-function validateInput(data) {
-  if (!data.fullName || data.fullName.trim().length < 2) {
-    return { valid: false, message: 'الاسم غير صحيح.' };
-  }
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!data.email || !emailRegex.test(data.email)) {
-    return { valid: false, message: 'البريد الإلكتروني غير صحيح.' };
-  }
-  const phoneRegex = /^(05\d{8}|9665\d{8}|\+9665\d{8})$/;
-  const cleanPhone = (data.phone || '').replace(/\s|-/g, '');
-  if (!phoneRegex.test(cleanPhone)) {
-    return { valid: false, message: 'رقم الجوال غير صحيح.' };
-  }
-  return { valid: true };
-}
-
-/**
- * إحضار الشيت المخصص للتسجيلات، أو إنشاؤه إذا لم يكن موجودًا
- */
-function getOrCreateSheet() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName(SHEET_NAME);
-
-  if (!sheet) {
-    sheet = ss.insertSheet(SHEET_NAME);
-    sheet.appendRow(['التاريخ والوقت', 'الاسم الكامل', 'البريد الإلكتروني', 'رقم الجوال', 'المصدر', 'الصفحة', 'الحالة']);
-    sheet.setFrozenRows(1);
-  }
-  return sheet;
-}
-
-/**
- * التحقق من وجود تسجيل سابق بنفس البريد أو نفس رقم الجوال
- */
-function isDuplicate(sheet, email, phone) {
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 2) return false; // فقط صف العناوين موجود
-
-  const range = sheet.getRange(2, 3, lastRow - 1, 2); // الأعمدة: البريد، الجوال
-  const values = range.getValues();
-
-  const normalizedEmail = email.trim().toLowerCase();
-  const normalizedPhone = phone.trim().replace(/\s|-/g, '');
-
-  return values.some(row => {
-    const existingEmail = String(row[0]).trim().toLowerCase();
-    const existingPhone = String(row[1]).trim().replace(/\s|-/g, '');
-    return existingEmail === normalizedEmail || existingPhone === normalizedPhone;
+/* -----------------------------------------------------------
+   5. FAQ Accordion (+ تتبّع فتح كل سؤال)
+   ----------------------------------------------------------- */
+function initFAQAccordion() {
+  const items = document.querySelectorAll('.faq-item');
+  items.forEach(item => {
+    const btn = item.querySelector('.faq-q');
+    btn.addEventListener('click', () => {
+      const isOpen = item.classList.contains('open');
+      items.forEach(i => i.classList.remove('open'));
+      if (!isOpen) {
+        item.classList.add('open');
+        pushEvent('faq_open', { question: btn.innerText });
+      }
+    });
   });
 }
 
-/**
- * إرسال بريد ترحيبي تلقائي للمستخدم بعد نجاح التسجيل
- */
-function sendUserConfirmationEmail(data) {
-  const subject = `تم تأكيد تسجيلك في ويبنار: ${WEBINAR_TITLE}`;
-  const body =
-`مرحبًا ${data.fullName}،
+/* -----------------------------------------------------------
+   6. Testimonials Slider (بسيط، بدون مكتبات)
+   ----------------------------------------------------------- */
+function initTestimonialsSlider() {
+  const track = document.getElementById('testiTrack');
+  const nav = document.getElementById('testiNav');
+  if (!track || !nav) return;
 
-يسعدنا تأكيد تسجيلك في الويبنار المجاني:
-"${WEBINAR_TITLE}"
+  const cards = track.querySelectorAll('.testi-card');
+  cards.forEach((_, i) => {
+    const dot = document.createElement('button');
+    dot.className = 'testi-dot' + (i === 0 ? ' active' : '');
+    dot.setAttribute('aria-label', `الشهادة رقم ${i + 1}`);
+    dot.addEventListener('click', () => {
+      cards[i].scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
+    });
+    nav.appendChild(dot);
+  });
 
-📅 الموعد: ${WEBINAR_DATE_TEXT}
-🔗 رابط الانضمام: ${WEBINAR_JOIN_URL}
+  const dots = nav.querySelectorAll('.testi-dot');
+  track.addEventListener('scroll', () => {
+    const index = Math.round(track.scrollLeft / (cards[0].offsetWidth + 24));
+    dots.forEach((d, i) => d.classList.toggle('active', i === index));
+  }, { passive: true });
+}
 
-سنذكّرك بالموعد قبل بدء الويبنار. نراك هناك!
+/* -----------------------------------------------------------
+   7. Ripple effect على الأزرار (+ تتبّع نقرات CTA عبر data-analytics)
+   ----------------------------------------------------------- */
+function initRippleButtons() {
+  document.querySelectorAll('.btn').forEach(btn => {
+    btn.addEventListener('click', function (e) {
+      const rect = this.getBoundingClientRect();
+      const ripple = document.createElement('span');
+      const size = Math.max(rect.width, rect.height);
+      ripple.className = 'ripple';
+      ripple.style.width = ripple.style.height = `${size}px`;
+      ripple.style.left = `${e.clientX - rect.left - size / 2}px`;
+      ripple.style.top = `${e.clientY - rect.top - size / 2}px`;
+      this.appendChild(ripple);
+      setTimeout(() => ripple.remove(), 650);
 
-مع تحياتنا،
-فريق وضوح`;
+      // ضع data-analytics="hero_cta_click" أو أي اسم مناسب على أي زر تريد تتبعه
+      if (this.dataset.analytics) pushEvent(this.dataset.analytics);
+    });
+  });
+}
 
-  try {
-    MailApp.sendEmail(data.email, subject, body);
-  } catch (err) {
-    // لا نوقف تنفيذ الطلب إذا فشل إرسال البريد، فقط نسجل الخطأ
-    Logger.log('فشل إرسال بريد المستخدم: ' + err.message);
+/* -----------------------------------------------------------
+   8. Scroll Depth Tracking (25/50/75/100%)
+   ----------------------------------------------------------- */
+function initScrollDepthTracking() {
+  const fired = { 25: false, 50: false, 75: false, 100: false };
+
+  window.addEventListener('scroll', () => {
+    const scrollTop = window.scrollY;
+    const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+    const pct = docHeight > 0 ? Math.round((scrollTop / docHeight) * 100) : 0;
+
+    [25, 50, 75, 100].forEach(mark => {
+      if (pct >= mark && !fired[mark]) {
+        fired[mark] = true;
+        pushEvent('scroll_depth', { percent: mark });
+      }
+    });
+  }, { passive: true });
+}
+
+/* -----------------------------------------------------------
+   9. Toast Notifications
+   ----------------------------------------------------------- */
+function showToast(message, type = 'success') {
+  const wrap = document.getElementById('toastWrap');
+  if (!wrap) return;
+  const toast = document.createElement('div');
+  toast.className = `toast ${type === 'error' ? 'error' : ''}`;
+  toast.textContent = message;
+  wrap.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add('show'));
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 400);
+  }, 4000);
+}
+
+/* -----------------------------------------------------------
+   10. Validation Helpers
+   ----------------------------------------------------------- */
+function isValidName(v) { return v.trim().length >= 2; }
+function isValidEmail(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim()); }
+function isValidSaudiPhone(v) {
+  const clean = v.trim().replace(/\s|-/g, '');
+  return /^(05\d{8}|9665\d{8}|\+9665\d{8})$/.test(clean);
+}
+
+// توليد معرّف فريد؛ يعتمد على crypto.randomUUID عند توفره (يتطلب HTTPS)
+// مع بديل آمن للمتصفحات القديمة أو الاستضافة عبر HTTP
+function generateLeadId() {
+  if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+    return window.crypto.randomUUID();
+  }
+  return 'lead-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10);
+}
+
+/* -----------------------------------------------------------
+   11. Registration Form — Fetch API بدون إعادة تحميل الصفحة
+   ----------------------------------------------------------- */
+function initRegistrationForm() {
+  const form = document.getElementById('registerForm');
+  if (!form) return;
+
+  const submitBtn = document.getElementById('submitBtn');
+  let isSubmitting = false;
+
+  // تتبّع أول تفاعل فعلي مع الفورم (form_start) — منفصل عن begin_registration عند الإرسال
+  let formStarted = false;
+  form.querySelectorAll('input').forEach(input => {
+    input.addEventListener('focus', () => {
+      if (!formStarted) {
+        formStarted = true;
+        pushEvent('form_start');
+      }
+    });
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (isSubmitting) return; // منع الإرسال المزدوج
+
+    pushEvent('begin_registration');
+
+    const fullName = document.getElementById('fullName');
+    const email = document.getElementById('email');
+    const phone = document.getElementById('phone');
+
+    let valid = true;
+    [fullName, email, phone].forEach(f => f.closest('.form-group').classList.remove('has-error'));
+
+    if (!isValidName(fullName.value)) {
+      fullName.closest('.form-group').classList.add('has-error');
+      valid = false;
+    }
+    if (!isValidEmail(email.value)) {
+      email.closest('.form-group').classList.add('has-error');
+      valid = false;
+    }
+    if (!isValidSaudiPhone(phone.value)) {
+      phone.closest('.form-group').classList.add('has-error');
+      valid = false;
+    }
+
+    if (!valid) {
+      pushEvent('validation_error');
+      showToast('يرجى تصحيح الحقول المظلّلة بالأحمر', 'error');
+      return;
+    }
+
+    // منع التسجيل المكرر من نفس الجهاز
+    if (localStorage.getItem(CONFIG.LS_KEY)) {
+      pushEvent('duplicate_registration', { source: 'local_storage' });
+      showToast('لقد سجّلت مسبقًا من هذا الجهاز 👍', 'error');
+      openSuccessModal();
+      return;
+    }
+
+    isSubmitting = true;
+    submitBtn.classList.add('loading');
+    submitBtn.disabled = true;
+
+    // التقاط UTM Parameters من رابط الصفحة (حملات Meta/TikTok/Google)
+    const urlParams = new URLSearchParams(window.location.search);
+    const utm = {
+      source: urlParams.get('utm_source'),
+      medium: urlParams.get('utm_medium'),
+      campaign: urlParams.get('utm_campaign'),
+      content: urlParams.get('utm_content'),
+      term: urlParams.get('utm_term')
+    };
+
+    // معرّف فريد لكل Lead لتسهيل مطابقة البيانات بين الأنظمة (Sheets / GTM / CRM)
+    const leadId = generateLeadId();
+
+    const payload = {
+      leadId,
+      fullName: fullName.value.trim(),
+      email: email.value.trim(),
+      phone: phone.value.trim(),
+      source: document.referrer || 'direct',
+      page: window.location.href,
+      timestamp: new Date().toISOString(),
+      utm_source: utm.source,
+      utm_medium: utm.medium,
+      utm_campaign: utm.campaign,
+      utm_content: utm.content,
+      utm_term: utm.term,
+      page_load_time: Math.round(performance.now())
+    };
+
+    try {
+      const response = await fetch(CONFIG.API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // text/plain لتفادي مشاكل CORS مع Apps Script
+        body: JSON.stringify(payload)
+      });
+
+      const result = await response.json();
+
+      if (result.status === 'success') {
+        localStorage.setItem(CONFIG.LS_KEY, JSON.stringify({ email: payload.email, date: payload.timestamp }));
+
+        // ملاحظة: لا نطلق fbq/ttq هنا — GTM هو من يستمع لحدث registration_success
+        // ويوزّعه على GA4 / Meta Lead / TikTok CompleteRegistration / Snap SIGN_UP.
+        // ملاحظة أخرى: لا نرسل بيانات شخصية (PII) مثل البريد الإلكتروني إلى dataLayer/GTM/GA4.
+        pushEvent('registration_success', {
+          lead_id: payload.leadId,
+          method: 'landing_page',
+          webinar: CONFIG.WEBINAR_TITLE,
+          utm_source: payload.utm_source,
+          utm_medium: payload.utm_medium,
+          utm_campaign: payload.utm_campaign
+        });
+
+        openSuccessModal();
+        form.reset();
+      } else if (result.status === 'duplicate') {
+        pushEvent('duplicate_registration', { source: 'server' });
+        showToast('هذا البريد أو الجوال مسجّل مسبقًا', 'error');
+        pushEvent('registration_failed', { reason: 'duplicate' });
+      } else {
+        throw new Error(result.message || 'حدث خطأ غير متوقع');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('تعذّر إرسال التسجيل، يرجى المحاولة مرة أخرى', 'error');
+      pushEvent('registration_failed', { reason: 'network_error' });
+    } finally {
+      isSubmitting = false;
+      submitBtn.classList.remove('loading');
+      submitBtn.disabled = false;
+    }
+  });
+
+  // إزالة تظليل الخطأ فور التصحيح
+  form.querySelectorAll('input').forEach(input => {
+    input.addEventListener('input', () => {
+      input.closest('.form-group').classList.remove('has-error');
+    });
+  });
+}
+
+/* -----------------------------------------------------------
+   12. Already registered on this device?
+   ----------------------------------------------------------- */
+function checkAlreadyRegistered() {
+  // لا نفتح المودال تلقائيًا، فقط نجهز الحالة إن احتجنا لاحقًا
+}
+
+/* -----------------------------------------------------------
+   13. Success Modal Controls
+   ----------------------------------------------------------- */
+function openSuccessModal() {
+  const modal = document.getElementById('successModal');
+  if (!modal) return;
+
+  pushEvent('thank_you_modal');
+
+  modal.classList.add('active');
+  document.body.style.overflow = 'hidden';
+
+  const calendarBtn = document.getElementById('addToCalendarBtn');
+  calendarBtn.href = buildGoogleCalendarLink();
+  // نضيف مستمع النقر مرة واحدة فقط لتفادي تكرار الحدث في كل مرة يُفتح فيها المودال
+  if (!calendarBtn.dataset.trackingBound) {
+    calendarBtn.dataset.trackingBound = 'true';
+    calendarBtn.addEventListener('click', () => {
+      pushEvent('add_to_calendar');
+    });
+  }
+
+  const whatsappBtn = document.getElementById('joinWhatsappBtn');
+  whatsappBtn.href = CONFIG.WHATSAPP_GROUP_URL;
+  if (!whatsappBtn.dataset.trackingBound) {
+    whatsappBtn.dataset.trackingBound = 'true';
+    whatsappBtn.addEventListener('click', () => {
+      pushEvent('join_whatsapp');
+    });
   }
 }
 
-/**
- * إرسال إشعار للإدارة عند كل تسجيل جديد
- */
-function sendAdminNotificationEmail(data) {
-  const subject = `تسجيل جديد في الويبنار: ${data.fullName}`;
-  const body =
-`تسجيل جديد وصل الآن:
-
-الاسم: ${data.fullName}
-البريد: ${data.email}
-الجوال: ${data.phone}
-المصدر: ${data.source || 'غير محدد'}
-الصفحة: ${data.page || 'غير محدد'}
-الوقت: ${new Date().toLocaleString('ar-SA')}`;
-
-  try {
-    MailApp.sendEmail(ADMIN_EMAIL, subject, body);
-  } catch (err) {
-    Logger.log('فشل إرسال بريد الإدارة: ' + err.message);
-  }
+function closeSuccessModal() {
+  const modal = document.getElementById('successModal');
+  if (!modal) return;
+  modal.classList.remove('active');
+  document.body.style.overflow = '';
 }
 
-/**
- * بناء استجابة JSON موحّدة
- */
-function buildJsonResponse(obj) {
-  return ContentService
-    .createTextOutput(JSON.stringify(obj))
-    .setMimeType(ContentService.MimeType.JSON);
+function initModalControls() {
+  const modal = document.getElementById('successModal');
+  const closeBtn = document.getElementById('modalCloseBtn');
+  if (!modal) return;
+
+  closeBtn.addEventListener('click', closeSuccessModal);
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) closeSuccessModal();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeSuccessModal();
+  });
 }
+
+/* -----------------------------------------------------------
+   14. Google Calendar Link Builder
+   ----------------------------------------------------------- */
+function buildGoogleCalendarLink() {
+  const start = new Date(CONFIG.WEBINAR_DATE_ISO);
+  const end = new Date(start.getTime() + CONFIG.WEBINAR_DURATION_MIN * 60000);
+
+  const fmt = (d) => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: CONFIG.WEBINAR_TITLE,
+    dates: `${fmt(start)}/${fmt(end)}`,
+    details: `${CONFIG.WEBINAR_DESCRIPTION}\n\nرابط الانضمام: ${CONFIG.WEBINAR_JOIN_URL}`,
+    location: CONFIG.WEBINAR_JOIN_URL
+  });
+
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
+// إتاحة الدالة عالميًا لاستخدامها في thank-you.html
+window.buildGoogleCalendarLink = buildGoogleCalendarLink;
+window.WEBINAR_CONFIG = CONFIG;
